@@ -17,13 +17,13 @@ AI Agent 按需技能加载引擎。通过 `npm install` 即可在任意 Node.js
 ### 安装
 
 ```bash
-npm install hive-mind ai @ai-sdk/openai
+npm install @ai-hivemind/core ai @ai-sdk/openai
 ```
 
 ### 5 分钟上手
 
 ```typescript
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 
 // 1. 创建实例
@@ -268,7 +268,7 @@ const hive = createHiveMind({
 
 ```typescript
 import express from 'express';
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 
 const app = express();
@@ -293,7 +293,7 @@ app.listen(3000);
 
 ```typescript
 // app/api/chat/route.ts
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 
 const hive = createHiveMind({

@@ -3,7 +3,7 @@
 ## 安装
 
 ```bash
-npm install hive-mind ai @ai-sdk/openai
+npm install @ai-hivemind/core ai @ai-sdk/openai
 ```
 
 Hive-Mind 依赖 [Vercel AI SDK](https://sdk.vercel.ai/docs)，LLM Provider 包是 peer dependency，按需安装。
@@ -31,7 +31,7 @@ Keep the original formatting and tone.
 ### 2. 编写代码
 
 ```typescript
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 
 const hive = createHiveMind({

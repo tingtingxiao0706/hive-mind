@@ -4,7 +4,7 @@
 
 Hive-Mind 是一个 TypeScript 库（npm 包），为 AI Agent 提供按需技能加载与脚本执行能力。兼容 SKILL.md 标准，基于 Vercel AI SDK 构建，复用 @skill-tools 生态，支持模型切换、工作区隔离、技能脚本执行、技能共享，以及 Agent 即技能模式。
 
-**核心价值主张**：通过 `npm install hive-mind` 就可以在任意 Node.js 应用中获得 OpenClaw 级别的技能系统能力，同时不绑定任何特定编辑器或模型供应商。
+**核心价值主张**：通过 `npm install @ai-hivemind/core` 就可以在任意 Node.js 应用中获得 OpenClaw 级别的技能系统能力，同时不绑定任何特定编辑器或模型供应商。
 
 ---
 
@@ -760,7 +760,7 @@ const hive = createHiveMind({
 ### 9.1 创建实例
 
 ```typescript
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 

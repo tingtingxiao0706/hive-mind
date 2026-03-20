@@ -11,7 +11,7 @@
  * Usage: npx tsx src/benchmark.ts
  */
 import 'dotenv/config';
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { createOpenAI } from '@ai-sdk/openai';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';

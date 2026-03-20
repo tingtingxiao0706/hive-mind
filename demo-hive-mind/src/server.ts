@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
-import { createHiveMind } from 'hive-mind';
-import type { HiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
+import type { HiveMind } from '@ai-hivemind/core';
 import { createOpenAI } from '@ai-sdk/openai';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

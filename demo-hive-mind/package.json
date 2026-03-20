@@ -8,7 +8,7 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "hive-mind": "file:../hive-mind",
+    "@ai-hivemind/core": "file:../hive-mind",
     "ai": "^4.1.0",
     "@ai-sdk/openai": "^1.2.0",
     "express": "^5.0.1",

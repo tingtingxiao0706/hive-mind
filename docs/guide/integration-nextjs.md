@@ -4,7 +4,7 @@
 
 ```typescript
 // app/api/chat/route.ts
-import { createHiveMind } from 'hive-mind';
+import { createHiveMind } from '@ai-hivemind/core';
 import { openai } from '@ai-sdk/openai';
 
 const hive = createHiveMind({
