@@ -1,0 +1,81 @@
+{
+  "name": "hive-mind",
+  "version": "0.1.0",
+  "description": "AI Agent 按需技能加载引擎 - 兼容 SKILL.md 标准，基于 Vercel AI SDK，支持模型切换、工作区隔离、脚本执行",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "skills",
+    "llm",
+    "skill-md",
+    "vercel-ai-sdk",
+    "progressive-loading"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "execa": "^9.5.2",
+    "gray-matter": "^4.0.3",
+    "lru-cache": "^11.0.2",
+    "zod": "^3.24.2"
+  },
+  "peerDependencies": {
+    "@ai-sdk/anthropic": ">=1.0.0",
+    "@ai-sdk/google": ">=1.0.0",
+    "@ai-sdk/openai": ">=1.0.0",
+    "ai": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "^1.2.0",
+    "@types/node": "^25.5.0",
+    "ai": "^4.1.0",
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3",
+    "vitepress": "^1.6.4",
+    "vitest": "^3.0.5"
+  }
+}

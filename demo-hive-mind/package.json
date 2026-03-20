@@ -1,0 +1,23 @@
+{
+  "name": "demo-hive-mind",
+  "version": "1.0.0",
+  "description": "Hive-Mind Express API Demo - AI 技能按需加载演示",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "hive-mind": "file:../hive-mind",
+    "ai": "^4.1.0",
+    "@ai-sdk/openai": "^1.2.0",
+    "express": "^5.0.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

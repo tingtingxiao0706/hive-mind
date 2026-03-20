@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#g)"/>
+  <g transform="translate(64,64)">
+    <!-- hexagon -->
+    <polygon points="0,-38 33,-19 33,19 0,38 -33,19 -33,-19" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"/>
+    <!-- inner connections -->
+    <circle cx="0" cy="-14" r="5" fill="white"/>
+    <circle cx="-12" cy="7" r="4" fill="white" opacity="0.8"/>
+    <circle cx="12" cy="7" r="4" fill="white" opacity="0.8"/>
+    <line x1="0" y1="-14" x2="-12" y2="7" stroke="white" stroke-width="2" opacity="0.6"/>
+    <line x1="0" y1="-14" x2="12" y2="7" stroke="white" stroke-width="2" opacity="0.6"/>
+    <line x1="-12" y1="7" x2="12" y2="7" stroke="white" stroke-width="2" opacity="0.6"/>
+  </g>
+</svg>
