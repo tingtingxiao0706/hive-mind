@@ -1,5 +1,5 @@
 {
-  "name": "hive-mind",
+  "name": "@ai-hivemind/core",
   "version": "0.1.0",
   "description": "AI Agent 按需技能加载引擎 - 兼容 SKILL.md 标准，基于 Vercel AI SDK，支持模型切换、工作区隔离、脚本执行",
   "type": "module",
@@ -29,6 +29,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
@@ -42,7 +43,16 @@
     "vercel-ai-sdk",
     "progressive-loading"
   ],
+  "author": "tingtingxiao0706",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tingtingxiao0706/hive-mind.git"
+  },
+  "homepage": "https://tingtingxiao0706.github.io/hive-mind/",
+  "bugs": {
+    "url": "https://github.com/tingtingxiao0706/hive-mind/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
