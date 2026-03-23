@@ -104,3 +104,117 @@ describe('createHiveMind (integration)', () => {
     expect(hive).toBeDefined();
   });
 });
+
+describe('loading strategy: eager', () => {
+  it('should list all skills with eager strategy', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'eager' },
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+    const names = skills.map(s => s.name);
+    expect(names).toContain('code-formatter');
+    expect(names).toContain('help');
+  });
+
+  it('should search skills with eager strategy', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'eager' },
+    });
+
+    const results = await hive.search('format code prettier');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]!.name).toBe('code-formatter');
+  });
+
+  it('should preload all skill contents on first ensureIndex', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'eager' },
+    });
+
+    // list() triggers ensureIndex() which triggers eager preloading
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+
+    // subsequent list() should return from cache
+    const start = performance.now();
+    const cached = await hive.list();
+    const elapsed = performance.now() - start;
+    expect(cached.length).toBe(skills.length);
+    expect(elapsed).toBeLessThan(5);
+  });
+});
+
+describe('loading strategy: lazy', () => {
+  it('should list all skills with lazy strategy', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'lazy' },
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+    const names = skills.map(s => s.name);
+    expect(names).toContain('code-formatter');
+    expect(names).toContain('git-commit');
+  });
+
+  it('should search skills with lazy strategy', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'lazy' },
+    });
+
+    const results = await hive.search('git commit changes');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]!.name).toBe('git-commit');
+  });
+
+  it('should accept lazy strategy with explicit skills config', () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'lazy' },
+    });
+
+    expect(hive).toBeDefined();
+    expect(typeof hive.run).toBe('function');
+    expect(typeof hive.stream).toBe('function');
+  });
+});
+
+describe('loading strategy: progressive (default)', () => {
+  it('should default to progressive when strategy is not set', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('should work with explicit progressive strategy', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { strategy: 'progressive' },
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+
+    const results = await hive.search('format code prettier');
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]!.name).toBe('code-formatter');
+  });
+});

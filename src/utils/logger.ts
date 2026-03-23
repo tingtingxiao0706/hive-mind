@@ -11,7 +11,7 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 export function createLogger(level: LogLevel = 'warn'): Logger {
-  const threshold = LOG_LEVELS[level];
+  const threshold = LOG_LEVELS[level]; // 日志级别阈值 (threshold: 日志级别阈值)
 
   const log = (lvl: LogLevel, message: string, ...args: unknown[]) => {
     if (LOG_LEVELS[lvl] >= threshold) {

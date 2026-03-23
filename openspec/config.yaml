@@ -1,0 +1,56 @@
+schema: spec-driven
+
+context: |
+  项目: Hive-Mind (@ai-hivemind/core)
+  定位: AI Agent 按需技能加载引擎，通过 npm install 即可在任意 Node.js 应用中获得 OpenClaw 级别的技能系统能力，不绑定特定编辑器或模型供应商。
+
+  技术栈:
+    - 语言: TypeScript (strict mode)
+    - 运行时: Node.js 18+
+    - AI 框架: Vercel AI SDK (ai 包)，支持 OpenAI / Anthropic / Google 等 30+ 供应商
+    - 构建: tsup (ESM + CJS 双输出)
+    - 测试: Vitest (73/73 通过)
+    - 文档: VitePress
+    - 包管理: npm
+
+  核心架构:
+    - 三阶段渐进式加载: 发现(name+description) → 激活(KeywordAdapter 路由 Top-K) → 执行(LLM 驱动)
+    - SKILL.md 兼容: 遵循 Agent Skills 标准，通过 x-hive 命名空间扩展
+    - 适配器模式: SkillParser (BuiltinAdapter/gray-matter) + SkillMatcher (KeywordAdapter)，预留 @skill-tools 对接
+    - 安全模型: basic / strict / sandbox 三级
+    - 跨语言脚本执行: RuntimeResolver 策略链 (Python/Bash/Node/Deno/Go)
+    - 工作区隔离: 不同工作区独立配置技能集、模型和安全策略
+
+  项目结构:
+    - src/ — 核心库源码 (engine, loader, registry, router, executor, agent, workspace)
+    - skills/ — 内置示例技能
+    - demo-hive-mind/ — Express Demo 项目
+    - docs/ — VitePress 文档站
+    - test/ — Vitest 测试
+
+  规范:
+    - 代码和 API 用英文命名
+    - 注释和文档用中文
+    - 使用 conventional commits
+    - peerDependencies: AI SDK Provider 按需安装
+    - 公共 API 从 src/index.ts 统一导出
+
+rules:
+  proposal:
+    - 用中文撰写
+    - 包含 "非目标 (Non-goals)" 部分
+    - 说明对现有 73 个测试用例的影响
+  specs:
+    - 用中文撰写
+    - 明确列出受影响的模块路径 (src/xxx)
+    - 说明是否需要新增 peerDependencies
+  design:
+    - 用中文撰写
+    - 包含架构图或流程图 (ASCII/Mermaid)
+    - 说明浏览器兼容性影响 (参照 architecture.md 3.5 节)
+    - 说明对三级安全模型的影响
+  tasks:
+    - 用中文撰写
+    - 每个任务不超过 2 小时
+    - 标注对应的测试文件 (test/xxx.test.ts)
+    - 包含 "验证方式" 说明
