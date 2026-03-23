@@ -37,6 +37,7 @@ const hive = createHiveMind({
   loading: {
     strategy: 'progressive',
     maxActivatedSkills: 5,
+    routerTopK: 5,
     cacheSize: 50,
   },
 
@@ -68,6 +69,7 @@ const hive = createHiveMind({
 | `stream(options)` | 流式执行，返回 AsyncIterable |
 | `list()` | 列出所有已注册技能 |
 | `search(query)` | 按关键词搜索技能 |
+| `install(source)` | 从远程源安装技能到本地 |
 | `runtimeStatus()` | 检查系统运行时状态 |
 
 ## 示例

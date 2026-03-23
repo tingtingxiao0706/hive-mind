@@ -6,7 +6,6 @@ import type {
   SkillMeta,
   SkillContent,
   RuntimeStatus,
-  Logger,
   ToolCallRecord,
 } from './types.js';
 import { SkillLoader } from './loader/index.js';
@@ -56,8 +55,24 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
   const callCache = new Map<string, { text: string; activatedSkills: string[]; usage?: unknown }>();
 
   // ── 子系统初始化 ──
-  const parser: SkillParser = resolveParser(config, logger);
-  const matcher: SkillMatcher = resolveMatcher(config, logger);
+  // parser / matcher 使用代理模式：初始指向内置实现，
+  // config.parser/router === 'auto' 时由 ensureAdapters() 惰性替换为 @skill-tools 实现。
+  // 代理对象在 SkillLoader / LocalRegistry / SkillRouter 中按引用持有，
+  // 替换 parserImpl/matcherImpl 后所有消费方自动切换。
+  let parserImpl: SkillParser = new BuiltinAdapter();
+  let matcherImpl: SkillMatcher = new KeywordAdapter();
+
+  const parser: SkillParser = {
+    parse: (filePath) => parserImpl.parse(filePath),
+    parseContent: (content, meta) => parserImpl.parseContent(content, meta),
+    resolveFiles: (searchPath) => parserImpl.resolveFiles(searchPath),
+    countTokens: (text) => parserImpl.countTokens(text),
+  };
+
+  const matcher: SkillMatcher = {
+    index: (skills) => matcherImpl.index(skills),
+    match: (query, topK) => matcherImpl.match(query, topK),
+  };
 
   const loader = new SkillLoader({
     parser,
@@ -65,7 +80,7 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
     logger,
   });
 
-  const router = new SkillRouter({ matcher, logger });
+  const router = new SkillRouter({ matcher, topK: config.loading?.routerTopK, logger });
 
   // ScriptExecutor 仅在 scripts.enabled 时创建，否则为 null，
   // 后续 buildToolsForSkills() 检测到 null 时不注入脚本工具
@@ -99,6 +114,61 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
   // eager 模式预加载缓存，首次 ensureIndex 时填充，install() 后置 null 强制重建
   let eagerContents: Map<string, SkillContent> | null = null;
 
+  // 运行时预检标记，首次 run()/stream() 时执行一次
+  let preflightDone = false;
+
+  /**
+   * 惰性运行时预检——首次 run()/stream() 时执行。
+   * 仅当 scripts.enabled && scripts.preflight === true 时触发。
+   * 预检结果由 RuntimeResolver 内部缓存，后续 runtimeStatus() 直接命中。
+   */
+  async function ensurePreflight(): Promise<void> {
+    if (preflightDone || !executor || !(config.scripts?.preflight)) return;
+    preflightDone = true;
+    const runtimes = config.scripts?.allowedRuntimes ?? ['bash', 'python', 'node'];
+    logger.info(`Preflight: checking ${runtimes.length} runtimes: [${runtimes.join(', ')}]...`);
+    await executor.preflight(runtimes);
+  }
+
+  // 适配器初始化标记，ensureAdapters() 仅执行一次
+  let adaptersReady = false;
+
+  /**
+   * 惰性适配器切换——首次 ensureIndex() 或 lazy 加载前执行。
+   *
+   * config.parser === 'auto' 时动态 import @skill-tools/core（v0.2.2），
+   * config.router === 'auto' 时动态 import @skill-tools/router（v0.2.2），
+   * 包未安装则静默回退到内置实现。
+   */
+  async function ensureAdapters(): Promise<void> {
+    if (adaptersReady) return;
+    adaptersReady = true;
+
+    if (config.parser === 'auto') {
+      try {
+        const corePkg = '@skill-tools/core';
+        const core = await import(/* webpackIgnore: true */ corePkg);
+        const { SkillToolsParserAdapter } = await import('./loader/adapters/skill-tools.js');
+        parserImpl = new SkillToolsParserAdapter(core);
+        logger.info('Adapter: using @skill-tools/core parser');
+      } catch {
+        logger.warn('Adapter: @skill-tools/core not available, falling back to builtin parser');
+      }
+    }
+
+    if (config.router === 'auto') {
+      try {
+        const routerPkg = '@skill-tools/router';
+        const { SkillRouter: STRouter } = await import(/* webpackIgnore: true */ routerPkg);
+        const { BM25Adapter } = await import('./router/adapters/bm25.js');
+        matcherImpl = new BM25Adapter(new STRouter());
+        logger.info('Adapter: using @skill-tools/router BM25 matcher');
+      } catch {
+        logger.warn('Adapter: @skill-tools/router not available, falling back to builtin keyword matcher');
+      }
+    }
+  }
+
   /**
    * Phase 1: 发现——惰性单次执行。
    * 扫描所有注册表拿到 name + description 轻量元数据，构建路由索引。
@@ -106,6 +176,7 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
    */
   async function ensureIndex(): Promise<SkillMeta[]> {
     if (!skillIndex) {
+      await ensureAdapters();
       logger.info('Phase 1: Discovery — scanning skill sources...');
       skillIndex = await registry.scan();
       logger.info(`Phase 1: Discovery — found ${skillIndex.length} skills:`);
@@ -141,7 +212,7 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
     if (!executor) return {};
     const allTools: Record<string, unknown> = {};
     for (const skill of skills) {
-      if (skill.scripts.length > 0 || skill.references.length > 0) {
+      if (skill.scripts.length > 0 || skill.references.length > 0 || skill.linkedFiles.length > 0) {
         const skillTools = createSkillTools(executor, skill);
         Object.assign(allTools, skillTools);
       }
@@ -233,8 +304,12 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
   async function resolveSkillContents(
     options: RunOptions | StreamOptions,
   ): Promise<{ activated: SkillMeta[]; skillContents: SkillContent[] }> {
+    await ensurePreflight();
+
     // lazy 模式 + 显式指定技能 → 跳过索引和路由，直接按名称加载
+    // ensureAdapters() 保证 parser 已切换（lazy 路径不经过 ensureIndex）
     if (strategy === 'lazy' && options.skills) {
+      await ensureAdapters();
       logger.info(`\nPhase 2: Activation [lazy] — loading ${options.skills.length} explicitly specified skills...`);
       const skillContents: SkillContent[] = [];
       for (const name of options.skills) {
@@ -476,24 +551,3 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
   return hiveMind;
 }
 
-/**
- * 解析器工厂——当前始终返回 BuiltinAdapter。
- * 预留 'auto' 分支用于未来对接 @skill-tools/core 适配器。
- */
-function resolveParser(config: HiveMindConfig, _logger: Logger): SkillParser {
-  if (config.parser === 'builtin') {
-    return new BuiltinAdapter();
-  }
-  return new BuiltinAdapter();
-}
-
-/**
- * 匹配器工厂——当前始终返回 KeywordAdapter。
- * 预留 'auto' 分支用于未来对接 @skill-tools/router BM25 适配器。
- */
-function resolveMatcher(config: HiveMindConfig, _logger: Logger): SkillMatcher {
-  if (config.router === 'builtin') {
-    return new KeywordAdapter();
-  }
-  return new KeywordAdapter();
-}

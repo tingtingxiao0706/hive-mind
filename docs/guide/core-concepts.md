@@ -53,6 +53,23 @@ my-skill/
     └── config.json
 ```
 
+### 跨技能文件引用
+
+技能的 SKILL.md body 中可以通过 markdown 链接引用其他目录的文件：
+
+```markdown
+## 工作流
+
+1. 加载通用规则 → [common-rules.md](../shared-standards/common-rules.md)
+2. 加载框架规则 → [react-rules.md](../shared-standards/react-rules.md)
+```
+
+引擎在加载技能时自动提取这些链接，将目标文件加入 `read_resource` 工具的访问白名单。LLM 按照 body 中的工作流指示按需读取。无需额外配置，技能作者只需正常写 markdown 链接即可。
+
+- 仅识别相对路径的本地文件链接（排除 `http://`、`#anchor` 等）
+- 自动验证文件存在性，不存在的链接静默忽略
+- 安全可控——只有 body 中明确写出的路径才被放行
+
 ## 技能路由
 
 当前使用 `KeywordAdapter`（关键词匹配），支持：

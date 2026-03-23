@@ -54,14 +54,16 @@ type SkillSource =
 interface LoadingConfig {
   strategy?: 'eager' | 'progressive' | 'lazy';
   maxActivatedSkills?: number;
+  routerTopK?: number;
   cacheSize?: number;
 }
 ```
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `strategy` | `'progressive'` | 加载策略 |
-| `maxActivatedSkills` | `5` | 单次最多激活技能数 |
+| `strategy` | `'progressive'` | 加载策略（`eager` 预加载所有 / `progressive` 路由匹配后加载 / `lazy` 跳过索引直接加载） |
+| `maxActivatedSkills` | `5` | 引擎层截断：注入 system prompt 的最大技能数 |
+| `routerTopK` | `5` | 路由层截断：路由匹配返回的候选技能数 |
 | `cacheSize` | `50` | LRU 缓存容量 |
 
 ### scripts

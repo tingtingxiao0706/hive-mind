@@ -8,11 +8,13 @@
     "start": "tsx src/server.ts"
   },
   "dependencies": {
-    "@ai-hivemind/core": "file:../hive-mind",
-    "ai": "^4.1.0",
+    "@ai-hivemind/core": "file:..",
     "@ai-sdk/openai": "^1.2.0",
-    "express": "^5.0.1",
-    "dotenv": "^16.4.7"
+    "@skill-tools/core": "^0.2.2",
+    "@skill-tools/router": "^0.2.2",
+    "ai": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "express": "^5.0.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

@@ -20,19 +20,14 @@ const openrouter = createOpenAI({
 // ---------------------------------------------------------------------------
 
 const SKILL_SOURCES = [{ type: 'local' as const, path: SKILLS_DIR }];
-const SCRIPT_CONFIG = {
-  enabled: true,
-  securityLevel: 'strict' as const,
-  allowedRuntimes: ['node', 'python'],
-  timeout: 10000,
-};
 
 function createUserHive(config: {
   label: string;
   defaultModel: string;
   smartModel: string;
+  securityLevel: 'basic' | 'strict' | 'sandbox';
 }): HiveMind {
-  console.log(`  Creating HiveMind for "${config.label}": default=${config.defaultModel}, smart=${config.smartModel}`);
+  console.log(`  Creating HiveMind for "${config.label}": security=${config.securityLevel}, model=${config.defaultModel}`);
   return createHiveMind({
     models: {
       default: openrouter(config.defaultModel),
@@ -40,25 +35,38 @@ function createUserHive(config: {
     },
     skills: SKILL_SOURCES,
     loading: { strategy: 'progressive', maxActivatedSkills: 3 },
-    scripts: SCRIPT_CONFIG,
+    scripts: {
+      enabled: true,
+      securityLevel: config.securityLevel,
+      allowedRuntimes: ['node', 'python'],
+      timeout: 10000,
+      preflight: true,
+    },
+    parser: 'auto',
+    router: 'auto',
     logLevel: 'debug',
   });
 }
 
-const tenants: Record<string, { hive: HiveMind; label: string; models: { default: string; smart: string } }> = {
+type TenantInfo = { hive: HiveMind; label: string; security: string; models: { default: string; smart: string } };
+
+const tenants: Record<string, TenantInfo> = {
   userA: {
-    hive: createUserHive({ label: 'User A', defaultModel: 'stepfun/step-3.5-flash:free', smartModel: 'stepfun/step-3.5-flash:free' }),
-    label: 'stepfun/step-3.5-flash:free',
+    hive: createUserHive({ label: 'User A (basic)', defaultModel: 'stepfun/step-3.5-flash:free', smartModel: 'stepfun/step-3.5-flash:free', securityLevel: 'basic' }),
+    label: 'User A — basic 安全',
+    security: 'basic',
     models: { default: 'stepfun/step-3.5-flash:free', smart: 'stepfun/step-3.5-flash:free' },
   },
   userB: {
-    hive: createUserHive({ label: 'User B', defaultModel: 'nvidia/nemotron-3-super-120b-a12b:free', smartModel: 'nvidia/nemotron-3-super-120b-a12b:free' }),
-    label: 'User B — Anthropic Claude 3.5 Haiku',
+    hive: createUserHive({ label: 'User B (strict)', defaultModel: 'nvidia/nemotron-3-super-120b-a12b:free', smartModel: 'nvidia/nemotron-3-super-120b-a12b:free', securityLevel: 'strict' }),
+    label: 'User B — strict 安全',
+    security: 'strict',
     models: { default: 'nvidia/nemotron-3-super-120b-a12b:free', smart: 'nvidia/nemotron-3-super-120b-a12b:free' },
   },
   userC: {
-    hive: createUserHive({ label: 'User C', defaultModel: 'arcee-ai/trinity-large-preview:free', smartModel: 'arcee-ai/trinity-large-preview:free' }),
-    label: 'User C — Google Gemini 2.0 Flash',
+    hive: createUserHive({ label: 'User C (sandbox)', defaultModel: 'arcee-ai/trinity-large-preview:free', smartModel: 'arcee-ai/trinity-large-preview:free', securityLevel: 'sandbox' }),
+    label: 'User C — sandbox 安全',
+    security: 'sandbox',
     models: { default: 'arcee-ai/trinity-large-preview:free', smart: 'arcee-ai/trinity-large-preview:free' },
   },
 };
@@ -82,6 +90,7 @@ app.get('/api/tenants', (_req, res) => {
   res.json(Object.entries(tenants).map(([id, t]) => ({
     id,
     label: t.label,
+    security: t.security,
     models: t.models,
   })));
 });
@@ -128,19 +137,26 @@ app.get('/api/skills', async (req, res) => {
   })));
 });
 
+app.get('/api/runtime-status', async (req, res) => {
+  const tenant = getTenant(req.query['userId'] as string);
+  const status = await tenant.hive.runtimeStatus();
+  res.json(status);
+});
+
 app.listen(PORT, () => {
   console.log(`
 ┌──────────────────────────────────────────────────────┐
 │  Hive-Mind Multi-Tenant Demo                         │
 │  http://localhost:${PORT}                                │
 ├──────────────────────────────────────────────────────┤
-│  User A: OpenAI GPT-4o-mini                          │
-│  User B: Anthropic Claude 3.5 Haiku                  │
-│  User C: Google Gemini 2.0 Flash                     │
+│  User A: basic   — 继承宿主环境，无运行时白名单      │
+│  User B: strict  — 环境隔离 + 运行时白名单           │
+│  User C: sandbox — JS 走 V8 沙盒，其他走 strict     │
 ├──────────────────────────────────────────────────────┤
-│  POST /api/chat     - Chat (with userId)             │
-│  GET  /api/tenants  - List tenants                   │
-│  GET  /api/skills   - List skills                    │
+│  POST /api/chat           - Chat (with userId)       │
+│  GET  /api/tenants        - List tenants             │
+│  GET  /api/skills         - List skills              │
+│  GET  /api/runtime-status - Runtime preflight status │
 └──────────────────────────────────────────────────────┘
 `);
 });

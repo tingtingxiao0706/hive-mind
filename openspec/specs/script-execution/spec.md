@@ -5,9 +5,7 @@
 在安全边界内执行技能目录中的跨语言脚本（Python/Bash/Node/Deno/Go），通过 RuntimeResolver 自动探测运行时并选择最优执行策略。
 
 > 模块: `src/executor/index.ts`, `src/executor/runtime.ts`, `src/executor/tools.ts` | 测试: `test/executor.test.ts` (13 个用例) | 状态: 已实现
-
 ## Requirements
-
 ### Requirement: ScriptExecutor 脚本执行器
 系统 SHALL 提供 ScriptExecutor 在安全边界内执行技能目录中的脚本文件。
 
@@ -66,11 +64,22 @@
 - **THEN** 返回空数组
 
 ### Requirement: preflight 运行时预检
-系统 SHALL 支持在引擎启动时预检运行时可用性。
+系统 SHALL 支持在引擎启动时预检运行时可用性。当 `scripts.preflight` 为 `true` 时，系统 SHALL 在首次 `run()`/`stream()` 调用时自动执行一次惰性预检。
 
 #### Scenario: 启动预检
-- **WHEN** 配置 `scripts.preflight: true`
-- **THEN** 初始化时检测所有 allowedRuntimes，不可用的发出 warning（不阻塞启动）
+- **GIVEN** `scripts.enabled` 为 `true` 且 `scripts.preflight` 为 `true`
+- **WHEN** 首次调用 `run()` 或 `stream()`
+- **THEN** 系统自动执行 `executor.preflight(allowedRuntimes)`，检测所有配置的运行时可用性，不可用的发出 warn 日志（不阻塞执行）
+
+#### Scenario: 预检结果缓存
+- **GIVEN** 预检已在首次 `run()` 时执行
+- **WHEN** 后续再次调用 `run()` 或 `stream()`
+- **THEN** 不重复执行预检，直接跳过
+
+#### Scenario: preflight 默认禁用
+- **GIVEN** `scripts.preflight` 未配置或配置为 `false`
+- **WHEN** 调用 `run()` 或 `stream()`
+- **THEN** 不执行预检
 
 #### Scenario: runtimeStatus 查询
 - **WHEN** 调用 `hive.runtimeStatus()`
@@ -86,3 +95,4 @@
 #### Scenario: read_resource 路径安全
 - **WHEN** LLM 通过 `read_resource` 读取文件
 - **THEN** 路径穿越检查同样生效，只允许读取技能目录内的文件
+

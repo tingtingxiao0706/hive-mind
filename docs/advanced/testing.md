@@ -2,18 +2,18 @@
 
 ## 自动化测试
 
-73 个测试全部通过，覆盖核心模块：
+97 个测试全部通过，覆盖核心模块：
 
 | 测试文件 | 测试数 | 覆盖模块 |
 |---------|-------|---------|
-| loader.test.ts | 5 | BuiltinAdapter 解析、SkillLoader 加载/缓存 |
+| loader.test.ts | 16 | BuiltinAdapter 解析、SkillLoader 加载/缓存、linkedFiles 提取（相对路径/HTTP 过滤/不存在文件/去重/e2e） |
 | router.test.ts | 8 | KeywordAdapter 关键词匹配、SkillRouter 路由 |
-| executor.test.ts | 13 | PEP 723 解析、路径穿越防护、allowed-tools 校验、runtime 白名单、输出截断、strict 环境隔离 |
-| sandbox.test.ts | 10 | V8 沙箱执行、CPU 超时、require 阻断、定时器阻断、env 权限控制、网络权限、错误处理 |
-| registry.test.ts | 5 | LocalRegistry 扫描/缓存、CompositeRegistry 合并/加载 |
-| remote-registry.test.ts | 4 | RemoteRegistry 创建、网络不可达降级、本地缓存回退 |
+| executor.test.ts | 20 | PEP 723 解析、路径穿越防护、allowed-tools 校验、runtime 白名单、输出截断、strict 环境隔离、read_resource linkedFiles 白名单 |
+| sandbox.test.ts | 11 | V8 沙箱执行、CPU 超时、require 阻断、定时器阻断、env 权限控制、网络权限、错误处理 |
+| registry.test.ts | 7 | LocalRegistry 扫描/缓存、CompositeRegistry 合并/加载 |
+| remote-registry.test.ts | 5 | RemoteRegistry 创建、网络不可达降级、本地缓存回退 |
 | extensions.test.ts | 6 | x-hive 扩展解析、部分配置、类型过滤 |
-| integration.test.ts | 8 | createHiveMind 集成、技能列表/搜索、远程注册表配置、工作区 |
+| integration.test.ts | 24 | createHiveMind 集成、技能列表/搜索、远程注册表配置、工作区、加载策略、运行时预检、适配器切换 |
 
 运行测试：
 

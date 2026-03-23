@@ -49,13 +49,23 @@ console.log(status);
 
 ## 工具注入
 
-当技能包含脚本时，引擎自动为 LLM 注入 `run_script` 工具：
+当技能包含脚本、参考文档或 body 中的链接文件时，引擎自动为 LLM 注入对应工具：
 
-```
-技能被激活 → 发现 scripts/ 目录 → 为每个脚本创建 tool → 注入 LLM 调用
-```
+| 条件 | 注入的工具 |
+|------|----------|
+| 技能包含 `scripts/` 目录 | `run_script`、`list_skill_files`、`read_resource` |
+| 技能包含 `references/` 目录或 body 中有本地链接 | `read_resource` |
 
-LLM 可以通过 `run_script` 工具执行脚本，传入参数并获取 stdout/stderr 输出。
+LLM 可以通过 `run_script` 执行脚本，通过 `read_resource` 读取参考文档和 body 中链接的文件。
+
+### read_resource 路径安全
+
+`read_resource` 允许读取以下路径的文件：
+
+- 技能自身目录内的所有文件（`references/`、`assets/` 等）
+- body 中 markdown 链接指向的本地文件（自动加入白名单）
+
+其他路径（包括 `../` 穿越到未声明的目录）会被拦截。
 
 ## 输出截断
 

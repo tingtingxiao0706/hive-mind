@@ -52,13 +52,18 @@ export function createSkillTools(executor: ScriptExecutor, skill: SkillContent):
     });
   }
 
-  if (skill.references.length > 0) {
+  const hasReadableFiles = skill.references.length > 0 || skill.linkedFiles.length > 0;
+  if (hasReadableFiles) {
+    const linkedDesc = skill.linkedFiles.length > 0
+      ? ` Also available: files linked in the skill body (use the path as written in markdown links).`
+      : '';
     tools['read_resource'] = tool({
-      description: `Read a reference document or asset from the "${skill.name}" skill directory`,
+      description:
+        `Read a reference document or linked file from the "${skill.name}" skill.` + linkedDesc,
       parameters: z.object({
         path: z
           .string()
-          .describe('Relative file path, e.g. "references/style-guide.md"'),
+          .describe('Relative file path, e.g. "references/style-guide.md" or a path from a markdown link in the skill body'),
       }),
       execute: async ({ path: filePath }) => {
         const pathMod = await import('node:path');
@@ -67,7 +72,10 @@ export function createSkillTools(executor: ScriptExecutor, skill: SkillContent):
         const absolute = pathMod.resolve(skillDir, filePath);
         const resolvedDir = pathMod.resolve(skillDir);
 
-        if (!absolute.startsWith(resolvedDir)) {
+        const inSkillDir = absolute.startsWith(resolvedDir);
+        const inLinkedFiles = skill.linkedFiles.includes(absolute);
+
+        if (!inSkillDir && !inLinkedFiles) {
           return { error: 'Path traversal detected' };
         }
 

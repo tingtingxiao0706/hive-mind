@@ -148,6 +148,42 @@ from rich.console import Console
 
 Hive-Mind 的 `RuntimeResolver` 会自动检测 PEP 723 声明，并通过 `uv run`、`pipx` 等工具管理依赖。
 
+## 跨技能文件引用
+
+如果多个技能共享一套规范文件（如编码规则、模板等），可以将共享内容放在独立目录中，通过 markdown 链接引用：
+
+```
+skills/
+├── frontend-coding-standards/
+│   └── SKILL.md              # body 中链接 ../shared-standards/*.md
+├── shared-standards/
+│   ├── common-rules.md
+│   ├── react-rules.md
+│   └── vue-rules.md
+```
+
+**SKILL.md 中的引用方式：**
+
+```markdown
+## 工作流
+
+1. 识别框架（检查 package.json）
+2. 加载规则：
+   - 通用规则 → [common-rules.md](../shared-standards/common-rules.md)
+   - React → [react-rules.md](../shared-standards/react-rules.md)
+   - Vue → [vue-rules.md](../shared-standards/vue-rules.md)
+3. 按规则编码
+```
+
+引擎在加载技能时会自动：
+
+1. 提取 body 中的 markdown 链接
+2. 过滤出相对路径的本地文件（排除 HTTP、锚点链接）
+3. 验证文件存在性
+4. 将合法路径加入 `read_resource` 工具的白名单
+
+LLM 会按照 body 中的工作流指示，在需要时调用 `read_resource` 读取对应文件。无需在 frontmatter 中额外声明依赖。
+
 ## 路由匹配技巧
 
 让技能更容易被路由匹配到：

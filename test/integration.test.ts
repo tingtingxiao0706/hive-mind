@@ -218,3 +218,119 @@ describe('loading strategy: progressive (default)', () => {
     expect(results[0]!.name).toBe('code-formatter');
   });
 });
+
+describe('runtime preflight', () => {
+  it('should accept preflight configuration', () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      scripts: {
+        enabled: true,
+        allowedRuntimes: ['bash', 'node'],
+        preflight: true,
+      },
+    });
+
+    expect(hive).toBeDefined();
+  });
+
+  it('should return runtime status when scripts enabled with preflight', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      scripts: {
+        enabled: true,
+        allowedRuntimes: ['node'],
+        preflight: true,
+      },
+    });
+
+    const status = await hive.runtimeStatus();
+    expect(status).toBeDefined();
+    expect(status['node']).toBeDefined();
+    expect(status['node']!.name).toBe('node');
+    expect(status['node']!.available).toBe(true);
+  });
+
+  it('should not preflight when preflight is false', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      scripts: {
+        enabled: true,
+        allowedRuntimes: ['node'],
+        preflight: false,
+      },
+    });
+
+    expect(hive).toBeDefined();
+    const status = await hive.runtimeStatus();
+    expect(status['node']).toBeDefined();
+  });
+});
+
+describe('adapter: parser/router config', () => {
+  it('should default to builtin adapters when parser/router not set', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+    expect(skills[0]!.name).toBeTruthy();
+  });
+
+  it('should use builtin adapters when explicitly set to builtin', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      parser: 'builtin',
+      router: 'builtin',
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+
+    const results = await hive.search('format code');
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  it('should fall back to builtin when auto is set but @skill-tools not installed', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      parser: 'auto',
+      router: 'auto',
+    });
+
+    const skills = await hive.list();
+    expect(skills.length).toBeGreaterThanOrEqual(5);
+
+    const results = await hive.search('git commit');
+    expect(results.length).toBeGreaterThan(0);
+  });
+});
+
+describe('routerTopK configuration', () => {
+  it('should respect routerTopK to limit router candidates', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+      loading: { routerTopK: 2 },
+    });
+
+    const results = await hive.search('code format project scaffold');
+    expect(results.length).toBeLessThanOrEqual(2);
+  });
+
+  it('should default to 5 when routerTopK is not set', async () => {
+    const hive = createHiveMind({
+      models: { default: {} as any },
+      skills: [{ type: 'local', path: SKILLS_DIR }],
+    });
+
+    const results = await hive.search('code');
+    expect(results.length).toBeLessThanOrEqual(5);
+  });
+});

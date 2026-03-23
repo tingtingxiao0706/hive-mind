@@ -28,6 +28,8 @@ export interface SkillContent extends SkillMeta {
   references: string[];
   /** Discovered asset files in assets/ directory */
   assets: string[];
+  /** Absolute paths of local files linked in the body via markdown syntax */
+  linkedFiles: string[];
 }
 
 export interface SkillFrontmatter {
@@ -103,7 +105,8 @@ export type SkillSource =
 
 export interface LoadingConfig {
   strategy?: 'eager' | 'progressive' | 'lazy'; // 加载策略 (eager: 立即加载, progressive: 渐进式加载, lazy: 懒加载)
-  maxActivatedSkills?: number; // 最大激活技能数 (default: 5)
+  maxActivatedSkills?: number; // 引擎层截断：注入 system prompt 的技能数 (default: 5)
+  routerTopK?: number; // 路由层截断：匹配返回的候选技能数 (default: 5)
   cacheSize?: number; // 缓存大小 (default: 50)
 }
 

@@ -38,4 +38,7 @@ features:
   - icon: 🏢
     title: 工作区隔离
     details: 不同工作区独立配置技能集、模型和安全策略，天然支持多租户 SaaS 场景。
+  - icon: 🔗
+    title: 跨技能文件引用
+    details: SKILL.md body 中的 markdown 链接自动识别，LLM 可按需读取链接文件，技能间共享规范零配置。
 ---

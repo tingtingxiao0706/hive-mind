@@ -29,8 +29,18 @@ interface SkillContent extends SkillMeta {
   scripts: ScriptFile[];
   references: string[];
   assets: string[];
+  linkedFiles: string[];
 }
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `body` | SKILL.md 的 markdown 正文（LLM 指令） |
+| `frontmatter` | 解析后的 frontmatter 字段 |
+| `scripts` | `scripts/` 目录下发现的脚本文件 |
+| `references` | `references/` 目录下发现的参考文档路径 |
+| `assets` | `assets/` 目录下发现的静态资源路径 |
+| `linkedFiles` | body 中 markdown 链接指向的本地文件的绝对路径（自动提取） |
 
 ### SkillFrontmatter
 

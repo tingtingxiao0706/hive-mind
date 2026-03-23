@@ -85,6 +85,8 @@ export class SkillLoader {
       this.discoverFilePaths(skillDir, 'assets'),
     ]);
 
+    const linkedFiles = await this.extractLinkedFiles(result.body, skillDir);
+
     const content: SkillContent = {
       name: result.frontmatter.name,
       description: result.frontmatter.description,
@@ -95,6 +97,7 @@ export class SkillLoader {
       scripts,
       references,
       assets,
+      linkedFiles,
     };
 
     this.cache.set(skillPath, content);
@@ -114,6 +117,38 @@ export class SkillLoader {
       return idx > 0 ? skillPath.slice(0, idx) : '.';
     }
     return skillPath;
+  }
+
+  private async extractLinkedFiles(
+    body: string,
+    skillDir: string,
+  ): Promise<string[]> {
+    const pathMod = await import('node:path');
+    const fs = await import('node:fs/promises');
+    const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g;
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    let match: RegExpExecArray | null;
+    while ((match = linkRegex.exec(body)) !== null) {
+      const href = match[2]!;
+      if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('#')) {
+        continue;
+      }
+      if (pathMod.isAbsolute(href)) {
+        continue;
+      }
+      const absolute = pathMod.resolve(skillDir, href);
+      if (seen.has(absolute)) continue;
+      seen.add(absolute);
+      try {
+        await fs.access(absolute);
+        results.push(absolute);
+      } catch {
+        // 文件不存在，跳过
+      }
+    }
+    return results;
   }
 
   private async discoverFiles(

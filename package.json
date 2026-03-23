@@ -1,6 +1,6 @@
 {
   "name": "@ai-hivemind/core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "AI Agent 按需技能加载引擎 - 兼容 SKILL.md 标准，基于 Vercel AI SDK，支持模型切换、工作区隔离、脚本执行",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -66,6 +66,8 @@
     "@ai-sdk/anthropic": ">=1.0.0",
     "@ai-sdk/google": ">=1.0.0",
     "@ai-sdk/openai": ">=1.0.0",
+    "@skill-tools/core": "0.2.2",
+    "@skill-tools/router": "0.2.2",
     "ai": ">=4.0.0"
   },
   "peerDependenciesMeta": {
@@ -77,10 +79,18 @@
     },
     "@ai-sdk/google": {
       "optional": true
+    },
+    "@skill-tools/core": {
+      "optional": true
+    },
+    "@skill-tools/router": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@ai-sdk/openai": "^1.2.0",
+    "@skill-tools/core": "^0.2.2",
+    "@skill-tools/router": "^0.2.2",
     "@types/node": "^25.5.0",
     "ai": "^4.1.0",
     "tsup": "^8.3.6",
