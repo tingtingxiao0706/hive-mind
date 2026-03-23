@@ -1,6 +1,6 @@
 {
   "name": "@ai-hivemind/core",
-  "version": "0.3.0",
+  "version": "0.2.0",
   "description": "AI Agent 按需技能加载引擎 - 兼容 SKILL.md 标准，基于 Vercel AI SDK，支持模型切换、工作区隔离、脚本执行",
   "type": "module",
   "main": "./dist/index.cjs",

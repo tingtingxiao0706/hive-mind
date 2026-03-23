@@ -2,6 +2,8 @@
 
 AI Agent 按需技能加载引擎。通过 `npm install` 即可在任意 Node.js 应用中获得 OpenClaw 级别的技能系统能力，不绑定特定编辑器或模型供应商。
 
+📖 [完整文档](https://tingtingxiao0706.github.io/hive-mind/)
+
 ## 特性
 
 - **渐进式加载** — 三阶段按需加载（发现 → 激活 → 执行），将 20 个技能的基线开销从 ~25,000 tokens 降到 ~500 tokens
