@@ -104,10 +104,11 @@ export type SkillSource =
   | { type: 'git'; url: string; branch?: string } // 远程技能源 (url: 技能源URL, branch: 分支名称)
 
 export interface LoadingConfig {
-  strategy?: 'eager' | 'progressive' | 'lazy'; // 加载策略 (eager: 立即加载, progressive: 渐进式加载, lazy: 懒加载)
+  strategy?: 'eager' | 'progressive' | 'lazy' | 'llm-routed'; // 加载策略 (eager: 立即加载, progressive: 渐进式加载, lazy: 懒加载, llm-routed: LLM 驱动路由)
   maxActivatedSkills?: number; // 引擎层截断：注入 system prompt 的技能数 (default: 5)
   routerTopK?: number; // 路由层截断：匹配返回的候选技能数 (default: 5)
   cacheSize?: number; // 缓存大小 (default: 50)
+  catalogueTokenBudget?: number; // llm-routed 模式下技能目录最大 token 预算（超出截断）
 }
 
 export interface ScriptConfig {

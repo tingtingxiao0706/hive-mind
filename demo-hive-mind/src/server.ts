@@ -26,15 +26,17 @@ function createUserHive(config: {
   defaultModel: string;
   smartModel: string;
   securityLevel: 'basic' | 'strict' | 'sandbox';
+  strategy?: 'progressive' | 'llm-routed';
 }): HiveMind {
-  console.log(`  Creating HiveMind for "${config.label}": security=${config.securityLevel}, model=${config.defaultModel}`);
+  const strategy = config.strategy ?? 'progressive';
+  console.log(`  Creating HiveMind for "${config.label}": security=${config.securityLevel}, strategy=${strategy}, model=${config.defaultModel}`);
   return createHiveMind({
     models: {
       default: openrouter(config.defaultModel),
       smart: openrouter(config.smartModel),
     },
     skills: SKILL_SOURCES,
-    loading: { strategy: 'progressive', maxActivatedSkills: 3 },
+    loading: { strategy, maxActivatedSkills: 3 },
     scripts: {
       enabled: true,
       securityLevel: config.securityLevel,
@@ -68,6 +70,12 @@ const tenants: Record<string, TenantInfo> = {
     label: 'User C — sandbox 安全',
     security: 'sandbox',
     models: { default: 'arcee-ai/trinity-large-preview:free', smart: 'arcee-ai/trinity-large-preview:free' },
+  },
+  userD: {
+    hive: createUserHive({ label: 'User D (llm-routed)', defaultModel: 'stepfun/step-3.5-flash:free', smartModel: 'stepfun/step-3.5-flash:free', securityLevel: 'basic', strategy: 'llm-routed' }),
+    label: 'User D — llm-routed 路由',
+    security: 'basic',
+    models: { default: 'stepfun/step-3.5-flash:free', smart: 'stepfun/step-3.5-flash:free' },
   },
 };
 
@@ -145,19 +153,20 @@ app.get('/api/runtime-status', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`
-┌──────────────────────────────────────────────────────┐
-│  Hive-Mind Multi-Tenant Demo                         │
-│  http://localhost:${PORT}                                │
-├──────────────────────────────────────────────────────┤
-│  User A: basic   — 继承宿主环境，无运行时白名单      │
-│  User B: strict  — 环境隔离 + 运行时白名单           │
-│  User C: sandbox — JS 走 V8 沙盒，其他走 strict     │
-├──────────────────────────────────────────────────────┤
-│  POST /api/chat           - Chat (with userId)       │
-│  GET  /api/tenants        - List tenants             │
-│  GET  /api/skills         - List skills              │
-│  GET  /api/runtime-status - Runtime preflight status │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Hive-Mind Multi-Tenant Demo                             │
+│  http://localhost:${PORT}                                    │
+├──────────────────────────────────────────────────────────┤
+│  User A: basic      — 继承宿主环境，无运行时白名单       │
+│  User B: strict     — 环境隔离 + 运行时白名单            │
+│  User C: sandbox    — JS 走 V8 沙盒，其他走 strict       │
+│  User D: llm-routed — LLM 自主选择技能（两阶段路由）     │
+├──────────────────────────────────────────────────────────┤
+│  POST /api/chat           - Chat (with userId)           │
+│  GET  /api/tenants        - List tenants                 │
+│  GET  /api/skills         - List skills                  │
+│  GET  /api/runtime-status - Runtime preflight status     │
+└──────────────────────────────────────────────────────────┘
 `);
 });
 

@@ -294,12 +294,110 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
   }
 
   /**
+   * 将技能元数据列表格式化为 system prompt 中的技能目录。
+   * llm-routed 策略使用，让 LLM 从目录中选择需要激活的技能。
+   */
+  function buildSkillCatalogue(metas: SkillMeta[]): string {
+    const budget = config.loading?.catalogueTokenBudget;
+    const lines: string[] = [
+      '## Available Skills',
+      '你可以通过 activate_skill 工具激活以下技能。如果用户的请求不需要任何技能，直接回答即可。',
+      '',
+    ];
+    let tokenEstimate = Math.ceil(lines.join('\n').length / 4);
+
+    for (const meta of metas) {
+      const line = `- ${meta.name}: ${meta.description}`;
+      const lineTokens = Math.ceil(line.length / 4);
+      if (budget && tokenEstimate + lineTokens > budget) {
+        lines.push('- ...（目录已截断，可通过 activate_skill 尝试激活未列出的技能）');
+        break;
+      }
+      lines.push(line);
+      tokenEstimate += lineTokens;
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * 构建 activate_skill 工具——llm-routed 策略的核心。
+   * LLM 调用此工具选择需要的技能，引擎负责加载和校验。
+   * 激活的技能内容收集到 activatedContents 中，供后续执行阶段使用。
+   */
+  function buildActivateSkillTool(
+    metas: SkillMeta[],
+    activatedContents: SkillContent[],
+    activateCache: Map<string, SkillContent>,
+    maxActivated: number,
+  ): Record<string, unknown> {
+    // 同步锁定集合，防止并行工具调用（SDK 可能并行执行同一 response 中的多个 tool call）
+    const pending = new Set<string>();
+
+    return {
+      activate_skill: tool({
+        description:
+          'Activate a skill to get its full instructions and tools. ' +
+          'Call this for each skill you need before working on the task.',
+        parameters: z.object({
+          name: z.string().describe('The skill name from the Available Skills list'),
+          reason: z.string().optional().describe('Why this skill is needed (for logging)'),
+        }),
+        execute: async ({ name, reason }: { name: string; reason?: string }) => {
+          const cached = activateCache.get(name);
+          if (cached) {
+            logger.info(`activate_skill: "${name}" already activated, returning cached`);
+            return { activated: true, name, description: cached.description, instructions: cached.body };
+          }
+
+          if (pending.has(name)) {
+            logger.info(`activate_skill: "${name}" already being activated, skipping duplicate`);
+            return { activated: true, name, description: '', instructions: '(duplicate call, already loading)' };
+          }
+
+          if (activateCache.size + pending.size >= maxActivated) {
+            logger.warn(`activate_skill: max activated skills (${maxActivated}) reached, rejecting "${name}"`);
+            return { error: `Max activated skills (${maxActivated}) reached. Cannot activate more skills.` };
+          }
+
+          const meta = metas.find(m => m.name === name);
+          if (!meta) {
+            logger.warn(`activate_skill: skill "${name}" not found in catalogue`);
+            return { error: `Skill "${name}" not found. Check the Available Skills list.` };
+          }
+
+          pending.add(name);
+          logger.info(`activate_skill: loading "${name}"${reason ? ` (reason: ${reason})` : ''}...`);
+
+          try {
+            const content = await loader.loadFull(meta.path);
+            activatedContents.push(content);
+            activateCache.set(name, content);
+
+            logger.info(`activate_skill: "${name}" activated — ~${Math.ceil(content.body.length / 4)} tokens, ${content.scripts.length} scripts`);
+
+            return {
+              activated: true,
+              name: content.name,
+              description: content.description,
+              instructions: content.body,
+            };
+          } finally {
+            pending.delete(name);
+          }
+        },
+      }),
+    };
+  }
+
+  /**
    * Phase 1 + Phase 2 共享逻辑——根据加载策略解析技能内容。
    *
    * - progressive（默认）：ensureIndex() → 路由匹配 → loadFull()
    * - eager：ensureIndex() → 路由匹配 → 从预加载缓存取值
    * - lazy + 显式指定：跳过索引和路由，直接 registry.load(name)
    * - lazy + 未指定：warn 日志 → 回退到 progressive 路径
+   * - llm-routed：ensureIndex() → 返回空内容（激活在 activate_skill 工具中完成）
    */
   async function resolveSkillContents(
     options: RunOptions | StreamOptions,
@@ -332,8 +430,14 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
       logger.warn('Phase 2: Activation [lazy] — no skills specified, falling back to progressive behavior');
     }
 
-    // progressive / eager / lazy-fallback 共用路径
+    // progressive / eager / lazy-fallback / llm-routed 共用 ensureIndex
     const metas = await ensureIndex();
+
+    // llm-routed 模式：返回空内容，实际激活在 activate_skill 工具调用时完成
+    if (strategy === 'llm-routed' && !options.skills) {
+      logger.info(`\nPhase 2: Activation [llm-routed] — ${metas.length} skills in catalogue, awaiting LLM routing...`);
+      return { activated: [], skillContents: [] };
+    }
 
     logger.info(`\nPhase 2: Activation — routing message: "${options.message.slice(0, 80)}..."`);
 
@@ -366,7 +470,7 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
       return { activated, skillContents };
     }
 
-    // progressive / lazy-fallback：按需加载
+    // progressive / lazy-fallback / llm-routed+explicit：按需加载
     logger.info(`Phase 2: Activation — loading full content for ${activated.length} skills...`);
     const skillContents = await Promise.all(
       activated.map(s => loader.loadFull(s.path)),
@@ -387,20 +491,10 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
      * Phase 3: generateText() 调用 LLM，maxSteps=10 允许多轮工具调用
      */
     async run(options: RunOptions): Promise<RunResult> {
-      // 动态 import 避免 ai 包未安装时 createHiveMind 就崩溃（ai 是 peerDep）
       const { generateText } = await import('ai');
 
-      // 顶层调用时重置 call_skill 状态
       if (callDepth === 0) { callSeq = 0; callCache.clear(); }
       const { activated, skillContents } = await resolveSkillContents(options);
-
-      // 组装 system prompt：用户自定义 systemPrompt + 各技能的 body
-      const systemParts: string[] = [];
-      if (options.systemPrompt) systemParts.push(options.systemPrompt);
-
-      for (const skill of skillContents) {
-        systemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
-      }
 
       const modelKey = options.model ?? 'default';
       const model = config.models[modelKey];
@@ -410,13 +504,125 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         );
       }
 
-      // 合并两类工具：脚本工具（run_script 等）+ call_skill
-      const scriptTools = buildToolsForSkills(skillContents);
       const callSkillTool = buildCallSkillTool(hiveMind.run, modelKey);
+
+      // ── llm-routed 两阶段执行 ──
+      if (strategy === 'llm-routed' && skillContents.length === 0 && !options.skills) {
+        const metas = await ensureIndex();
+        const catalogue = buildSkillCatalogue(metas);
+        const maxActivated = config.loading?.maxActivatedSkills ?? 5;
+        const activatedContents: SkillContent[] = [];
+        const activateCache = new Map<string, SkillContent>();
+        const activateTool = buildActivateSkillTool(metas, activatedContents, activateCache, maxActivated);
+
+        // Phase 2a: LLM 路由——LLM 从目录中选择需要的技能
+        const routingSystemParts: string[] = [];
+        if (options.systemPrompt) routingSystemParts.push(options.systemPrompt);
+        routingSystemParts.push(catalogue);
+
+        const routingTools = { ...activateTool, ...callSkillTool };
+        logger.info(`Phase 2a: LLM Routing — calling model "${modelKey}" with skill catalogue (${metas.length} skills)...`);
+
+        const toolCallRecords: ToolCallRecord[] = [];
+
+        const routingResult = await generateText({
+          model,
+          system: routingSystemParts.join('\n\n---\n\n'),
+          prompt: options.message,
+          maxTokens: options.maxTokens,
+          tools: routingTools as Parameters<typeof generateText>[0]['tools'],
+          maxSteps: 5,
+        });
+
+        // 收集路由阶段的工具调用记录
+        if (routingResult.steps) {
+          for (const step of routingResult.steps) {
+            if (step.toolCalls) {
+              for (const tc of step.toolCalls) {
+                logger.debug(`  Tool call: ${tc.toolName}(${JSON.stringify(tc.args)})`);
+                toolCallRecords.push({ toolName: tc.toolName, args: tc.args as Record<string, unknown>, result: undefined });
+              }
+            }
+          }
+        }
+
+        // 无技能被激活 → LLM 判断不需要技能，直接返回路由阶段的回答
+        if (activatedContents.length === 0) {
+          logger.info('Phase 2a: LLM Routing — no skills activated, returning direct answer');
+          return {
+            text: routingResult.text,
+            activatedSkills: [],
+            toolCalls: toolCallRecords,
+            usage: routingResult.usage ? {
+              promptTokens: routingResult.usage.promptTokens,
+              completionTokens: routingResult.usage.completionTokens,
+              totalTokens: routingResult.usage.promptTokens + routingResult.usage.completionTokens,
+            } : undefined,
+          };
+        }
+
+        // Phase 3: 执行——用激活的技能 body + 工具发起第二次 LLM 调用
+        // 并行工具调用可能产生重复，按名称去重
+        const uniqueContents = [...new Map(activatedContents.map(c => [c.name, c])).values()];
+        logger.info(`Phase 3: Execution [llm-routed] — ${uniqueContents.length} skills activated: [${uniqueContents.map(s => s.name).join(', ')}]`);
+        const execSystemParts: string[] = [];
+        if (options.systemPrompt) execSystemParts.push(options.systemPrompt);
+        for (const skill of uniqueContents) {
+          execSystemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
+        }
+
+        const scriptTools = buildToolsForSkills(uniqueContents);
+        const execTools = { ...scriptTools, ...callSkillTool };
+
+        logger.info(`Phase 3: Execution — calling model "${modelKey}" with ${Object.keys(execTools).length} tools...`);
+        const execResult = await generateText({
+          model,
+          system: execSystemParts.join('\n\n---\n\n'),
+          prompt: options.message,
+          maxTokens: options.maxTokens,
+          tools: execTools as Parameters<typeof generateText>[0]['tools'],
+          maxSteps: 10,
+        });
+
+        if (execResult.steps) {
+          for (const step of execResult.steps) {
+            if (step.toolCalls) {
+              for (const tc of step.toolCalls) {
+                logger.debug(`  Tool call: ${tc.toolName}(${JSON.stringify(tc.args)})`);
+                toolCallRecords.push({ toolName: tc.toolName, args: tc.args as Record<string, unknown>, result: undefined });
+              }
+            }
+          }
+        }
+
+        if (execResult.usage) {
+          logger.info(`Phase 3: Execution — done. Tokens: prompt=${execResult.usage.promptTokens}, completion=${execResult.usage.completionTokens}`);
+        }
+
+        return {
+          text: execResult.text,
+          activatedSkills: uniqueContents.map(s => s.name),
+          toolCalls: toolCallRecords,
+          usage: execResult.usage ? {
+            promptTokens: execResult.usage.promptTokens,
+            completionTokens: execResult.usage.completionTokens,
+            totalTokens: execResult.usage.promptTokens + execResult.usage.completionTokens,
+          } : undefined,
+        };
+      }
+
+      // ── 标准路径（progressive / eager / lazy / llm-routed+explicit） ──
+      const systemParts: string[] = [];
+      if (options.systemPrompt) systemParts.push(options.systemPrompt);
+
+      for (const skill of skillContents) {
+        systemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
+      }
+
+      const scriptTools = buildToolsForSkills(skillContents);
       const tools = { ...scriptTools, ...callSkillTool };
       const hasTools = Object.keys(tools).length > 0;
 
-      // ── Phase 3: 执行 ──
       logger.info(`Phase 3: Execution — calling model "${modelKey}"${hasTools ? ` with ${Object.keys(tools).length} tools` : ''}...`);
 
       const toolCallRecords: ToolCallRecord[] = [];
@@ -430,7 +636,6 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         maxSteps: 10,
       });
 
-      // 从 result.steps 收集所有工具调用记录
       if (result.steps) {
         for (const step of result.steps) {
           if (step.toolCalls) {
@@ -470,14 +675,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
      * 返回 async iterable，调用方通过 for-await-of 逐块消费。
      */
     async stream(options: StreamOptions): Promise<AsyncIterable<string>> {
-      const { streamText } = await import('ai');
+      const { streamText, generateText } = await import('ai');
       const { skillContents } = await resolveSkillContents(options);
-
-      const systemParts: string[] = [];
-      if (options.systemPrompt) systemParts.push(options.systemPrompt);
-      for (const skill of skillContents) {
-        systemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
-      }
 
       const modelKey = options.model ?? 'default';
       const model = config.models[modelKey];
@@ -487,8 +686,70 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         );
       }
 
-      const scriptTools = buildToolsForSkills(skillContents);
       const callSkillTool = buildCallSkillTool(hiveMind.run, modelKey);
+
+      // ── llm-routed 两阶段流式 ──
+      if (strategy === 'llm-routed' && skillContents.length === 0 && !options.skills) {
+        const metas = await ensureIndex();
+        const catalogue = buildSkillCatalogue(metas);
+        const maxActivated = config.loading?.maxActivatedSkills ?? 5;
+        const activatedContents: SkillContent[] = [];
+        const activateCache = new Map<string, SkillContent>();
+        const activateTool = buildActivateSkillTool(metas, activatedContents, activateCache, maxActivated);
+
+        // Phase 2a: 路由（非流式，需完整结果后决定是否进入执行阶段）
+        const routingSystemParts: string[] = [];
+        if (options.systemPrompt) routingSystemParts.push(options.systemPrompt);
+        routingSystemParts.push(catalogue);
+
+        logger.info(`Phase 2a: LLM Routing [stream] — calling model "${modelKey}" with skill catalogue...`);
+        const routingResult = await generateText({
+          model,
+          system: routingSystemParts.join('\n\n---\n\n'),
+          prompt: options.message,
+          maxTokens: options.maxTokens,
+          tools: { ...activateTool, ...callSkillTool } as Parameters<typeof generateText>[0]['tools'],
+          maxSteps: 5,
+        });
+
+        if (activatedContents.length === 0) {
+          logger.info('Phase 2a: LLM Routing [stream] — no skills activated, streaming routing result');
+          async function* yieldText() { yield routingResult.text; }
+          return yieldText();
+        }
+
+        // Phase 3: 流式执行
+        const uniqueContents = [...new Map(activatedContents.map(c => [c.name, c])).values()];
+        logger.info(`Phase 3: Execution [llm-routed stream] — ${uniqueContents.length} skills activated`);
+        const execSystemParts: string[] = [];
+        if (options.systemPrompt) execSystemParts.push(options.systemPrompt);
+        for (const skill of uniqueContents) {
+          execSystemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
+        }
+
+        const scriptTools = buildToolsForSkills(uniqueContents);
+        const execTools = { ...scriptTools, ...callSkillTool };
+
+        const execResult = streamText({
+          model,
+          system: execSystemParts.join('\n\n---\n\n'),
+          prompt: options.message,
+          maxTokens: options.maxTokens,
+          tools: execTools as Parameters<typeof streamText>[0]['tools'],
+          maxSteps: 10,
+        });
+
+        return execResult.textStream;
+      }
+
+      // ── 标准路径 ──
+      const systemParts: string[] = [];
+      if (options.systemPrompt) systemParts.push(options.systemPrompt);
+      for (const skill of skillContents) {
+        systemParts.push(`## Skill: ${skill.name}\n\n${skill.body}`);
+      }
+
+      const scriptTools = buildToolsForSkills(skillContents);
       const tools = { ...scriptTools, ...callSkillTool };
 
       logger.info(`Phase 3: Execution — streaming from model "${modelKey}" with ${Object.keys(tools).length} tools...`);
