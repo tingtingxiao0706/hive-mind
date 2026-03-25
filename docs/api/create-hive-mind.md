@@ -35,10 +35,11 @@ const hive = createHiveMind({
 
   // 加载策略（可选）
   loading: {
-    strategy: 'progressive',
+    strategy: 'progressive',    // 'eager' | 'progressive' | 'lazy' | 'llm-routed'
     maxActivatedSkills: 5,
     routerTopK: 5,
     cacheSize: 50,
+    catalogueTokenBudget: 2000, // llm-routed 专用
   },
 
   // 脚本执行（可选）
@@ -107,4 +108,22 @@ const hive = createHiveMind({
   logLevel: 'debug',
   maxCallDepth: 3,
 });
+```
+
+### LLM 驱动路由
+
+```typescript
+const hive = createHiveMind({
+  models: { default: openai('gpt-4o') },
+  skills: [{ type: 'local', path: './skills' }],
+  loading: {
+    strategy: 'llm-routed',
+    maxActivatedSkills: 3,
+    catalogueTokenBudget: 2000,
+  },
+});
+
+// LLM 自动判断是否需要技能、选择哪个
+const result = await hive.run({ message: '翻译这段文字' });
+console.log(result.activatedSkills); // ['translator']
 ```

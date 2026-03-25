@@ -52,19 +52,21 @@ type SkillSource =
 
 ```typescript
 interface LoadingConfig {
-  strategy?: 'eager' | 'progressive' | 'lazy';
+  strategy?: 'eager' | 'progressive' | 'lazy' | 'llm-routed';
   maxActivatedSkills?: number;
   routerTopK?: number;
   cacheSize?: number;
+  catalogueTokenBudget?: number;
 }
 ```
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `strategy` | `'progressive'` | 加载策略（`eager` 预加载所有 / `progressive` 路由匹配后加载 / `lazy` 跳过索引直接加载） |
-| `maxActivatedSkills` | `5` | 引擎层截断：注入 system prompt 的最大技能数 |
-| `routerTopK` | `5` | 路由层截断：路由匹配返回的候选技能数 |
+| `strategy` | `'progressive'` | 加载策略（`eager` 预加载所有 / `progressive` 路由匹配后加载 / `lazy` 跳过索引直接加载 / `llm-routed` LLM 自主选择技能） |
+| `maxActivatedSkills` | `5` | 引擎层截断：注入 system prompt 的最大技能数（llm-routed 模式下为 `activate_skill` 可激活的上限） |
+| `routerTopK` | `5` | 路由层截断：路由匹配返回的候选技能数（仅 progressive 模式使用） |
 | `cacheSize` | `50` | LRU 缓存容量 |
+| `catalogueTokenBudget` | `undefined` | llm-routed 模式下技能目录注入 system prompt 的最大 token 预算，超出时截断并提示 LLM |
 
 ### scripts
 

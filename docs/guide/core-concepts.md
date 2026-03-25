@@ -72,13 +72,39 @@ my-skill/
 
 ## 技能路由
 
-当前使用 `KeywordAdapter`（关键词匹配），支持：
+### 关键词路由（progressive 默认）
+
+使用 `KeywordAdapter`（关键词匹配），支持：
 
 - 完全匹配 / 部分匹配 / CJK 子串匹配
 - 技能的 `name`、`description`、`tags` 均参与评分
 - 中文、日文、韩文字符逐字提取 + 双字组合分词
 
 架构预留了 BM25 路由接口（通过 `@skill-tools/router` 适配器），可在需要时启用。
+
+### LLM 驱动路由（llm-routed）
+
+`llm-routed` 策略将路由决策交给 LLM，在技能数量多或用户意图模糊时效果显著优于关键词匹配。
+
+工作流程采用**两阶段 LLM 调用**：
+
+1. **Phase 2a — LLM 路由**：所有技能的 name + description 作为目录注入 system prompt，LLM 通过 `activate_skill` 工具选择需要的技能。引擎负责加载完整内容、安全校验、工具注册。
+2. **Phase 3 — 执行**：如果有技能被激活，引擎发起第二次 LLM 调用，携带技能 body 和工具（run_script / read_resource 等）。如果 LLM 判断不需要技能，直接返回第一次调用的回答。
+
+```typescript
+const hive = createHiveMind({
+  models: { default: openai('gpt-4o') },
+  skills: [{ type: 'local', path: './skills' }],
+  loading: { strategy: 'llm-routed', maxActivatedSkills: 3 },
+});
+```
+
+关键设计：
+- 引擎保持对激活和执行的完全控制——`activate_skill` 仅是路由工具，不授予 LLM 文件系统访问权
+- 支持单次对话中激活多个技能（多次 `activate_skill` 调用）
+- 内置去重和数量限制（`maxActivatedSkills`）
+- 显式指定 `options.skills` 时跳过 LLM 路由，走标准路径
+- 可通过 `catalogueTokenBudget` 限制技能目录的 token 预算
 
 ## 技能链调用
 

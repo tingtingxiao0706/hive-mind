@@ -41,4 +41,7 @@ features:
   - icon: 🔗
     title: 跨技能文件引用
     details: SKILL.md body 中的 markdown 链接自动识别，LLM 可按需读取链接文件，技能间共享规范零配置。
+  - icon: 🧠
+    title: LLM 驱动路由
+    details: llm-routed 策略让 LLM 从技能目录中自主选择，语义理解优于关键词匹配，引擎保持对激活和执行的安全管控。
 ---

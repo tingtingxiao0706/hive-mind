@@ -2,7 +2,7 @@
 
 ## 自动化测试
 
-97 个测试全部通过，覆盖核心模块：
+108 个测试全部通过，覆盖核心模块：
 
 | 测试文件 | 测试数 | 覆盖模块 |
 |---------|-------|---------|
@@ -14,6 +14,7 @@
 | remote-registry.test.ts | 5 | RemoteRegistry 创建、网络不可达降级、本地缓存回退 |
 | extensions.test.ts | 6 | x-hive 扩展解析、部分配置、类型过滤 |
 | integration.test.ts | 24 | createHiveMind 集成、技能列表/搜索、远程注册表配置、工作区、加载策略、运行时预检、适配器切换 |
+| llm-routed.test.ts | 11 | llm-routed 策略创建、技能目录注入、activate_skill 工具、两阶段调用、去重/数量限制、catalogueTokenBudget |
 
 运行测试：
 
@@ -36,6 +37,7 @@ npm run test:watch    # 监听模式
 | Node.js 脚本执行 | ✅ text-analyzer → analyze.js |
 | Python 脚本执行 | ✅ json-tools → json_tool.py |
 | Token 消耗对比 | ✅ prompt 节省 74.3% |
+| LLM 驱动路由 | ✅ llm-routed 策略两阶段调用、无技能时直接回答 |
 
 ## Token 消耗 Benchmark
 
