@@ -10,6 +10,7 @@
   "dependencies": {
     "@ai-hivemind/core": "file:..",
     "@ai-sdk/openai": "^1.2.0",
+    "@modelcontextprotocol/sdk": "^1.28.0",
     "@skill-tools/core": "^0.2.2",
     "@skill-tools/router": "^0.2.2",
     "ai": "^4.1.0",

@@ -94,6 +94,8 @@ export interface HiveMindConfig {
   logLevel?: 'debug' | 'info' | 'warn' | 'error' | 'silent'; // 日志级别 (debug: 调试, info: 信息, warn: 警告, error: 错误, silent: 静默)
   /** Max nesting depth for skill-to-skill calls (default: 5) */
   maxCallDepth?: number; // 技能调用最大嵌套深度 (default: 5)
+  /** MCP Server 连接配置（optional peerDep: @modelcontextprotocol/sdk） */
+  mcp?: McpConfig;
 }
 
 export type ModelConfig = Record<string, LanguageModel>;
@@ -220,6 +222,25 @@ export interface ExecutionStrategy {
   runtime: string; // 运行时 (runtime: 运行时)
   isolated: boolean; // 是否隔离 (isolated: 是否隔离)
 }
+
+// ---------------------------------------------------------------------------
+// MCP configuration
+// ---------------------------------------------------------------------------
+
+export interface McpConfig {
+  servers: McpServerConfig[];
+  timeout?: number; // 工具调用超时，默认 30000ms
+}
+
+export interface McpServerConfig {
+  name: string; // 唯一标识，如 "github", "filesystem"
+  transport: McpTransport;
+}
+
+export type McpTransport =
+  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: 'sse'; url: string; headers?: Record<string, string> }
+  | { type: 'streamable-http'; url: string; headers?: Record<string, string> };
 
 // ---------------------------------------------------------------------------
 // Logger

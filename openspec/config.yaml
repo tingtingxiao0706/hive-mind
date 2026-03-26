@@ -9,20 +9,25 @@ context: |
     - 运行时: Node.js 18+
     - AI 框架: Vercel AI SDK (ai 包)，支持 OpenAI / Anthropic / Google 等 30+ 供应商
     - 构建: tsup (ESM + CJS 双输出)
-    - 测试: Vitest (73/73 通过)
+    - 测试: Vitest (124/124 通过)
     - 文档: VitePress
     - 包管理: npm
 
   核心架构:
-    - 三阶段渐进式加载: 发现(name+description) → 激活(KeywordAdapter 路由 Top-K) → 执行(LLM 驱动)
+    - 四种加载策略: eager / progressive / lazy / llm-routed
+    - 渐进式加载: 发现(name+description) → 激活(KeywordAdapter 路由 Top-K) → 执行(LLM 驱动)
+    - LLM 驱动路由: 技能目录注入 system prompt，LLM 通过 activate_skill 工具选择技能，引擎控制激活和执行
     - SKILL.md 兼容: 遵循 Agent Skills 标准，通过 x-hive 命名空间扩展
-    - 适配器模式: SkillParser (BuiltinAdapter/gray-matter) + SkillMatcher (KeywordAdapter)，预留 @skill-tools 对接
+    - 适配器模式: SkillParser (BuiltinAdapter / @skill-tools/core) + SkillMatcher (KeywordAdapter / @skill-tools/router BM25)
     - 安全模型: basic / strict / sandbox 三级
     - 跨语言脚本执行: RuntimeResolver 策略链 (Python/Bash/Node/Deno/Go)
     - 工作区隔离: 不同工作区独立配置技能集、模型和安全策略
+    - 跨技能文件引用: body 中 markdown 链接自动识别，LLM 按需读取
+    - 技能链调用: call_skill 工具支持技能间委托调用（深度限制 + 去重缓存）
+    - MCP Client: 连接外部 MCP Server (stdio/SSE/streamable-http)，工具自动注入 LLM 工具链
 
   项目结构:
-    - src/ — 核心库源码 (engine, loader, registry, router, executor, agent, workspace)
+    - src/ — 核心库源码 (engine, loader, registry, router, executor, agent, workspace, mcp)
     - skills/ — 内置示例技能
     - demo-hive-mind/ — Express Demo 项目
     - docs/ — VitePress 文档站
@@ -39,7 +44,7 @@ rules:
   proposal:
     - 用中文撰写
     - 包含 "非目标 (Non-goals)" 部分
-    - 说明对现有 73 个测试用例的影响
+    - 说明对现有 124 个测试用例的影响
   specs:
     - 用中文撰写
     - 明确列出受影响的模块路径 (src/xxx)

@@ -16,6 +16,7 @@ AI Agent 按需技能加载引擎。通过 `npm install` 即可在任意 Node.js
 - **技能链调用** — 技能运行时可通过 `call_skill` 工具委托子任务给其他技能，支持深度限制和去重
 - **跨技能文件引用** — SKILL.md body 中的 markdown 链接自动识别，LLM 可按需读取链接文件
 - **LLM 驱动路由** — `llm-routed` 策略让 LLM 自主选择需要的技能，路由准确率优于关键词匹配，同时引擎保持对激活和执行的安全管控
+- **MCP Client 集成** — 连接外部 MCP Server（stdio / SSE / streamable-http），将 MCP 工具自动注入 LLM 工具链，`mcp__<server>__<tool>` 命名隔离
 
 ## 快速开始
 
@@ -220,6 +221,15 @@ const hive = createHiveMind({
   parser: 'auto',             // 'auto' | 'builtin'
   router: 'auto',             // 'auto' | 'builtin'
 
+  // MCP Server 连接（可选）
+  mcp: {
+    servers: [
+      { name: 'filesystem', transport: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'] } },
+      { name: 'github', transport: { type: 'streamable-http', url: 'http://localhost:3001/mcp' } },
+    ],
+    timeout: 30_000,
+  },
+
   // 技能链调用深度限制（可选，默认 5）
   maxCallDepth: 5,
 
@@ -290,6 +300,14 @@ const status = await hive.runtimeStatus();
 //   python: { available: true,  version: '3.12.1', command: 'python3' },
 //   node:   { available: true,  version: '20.11.0', command: 'node' },
 // }
+```
+
+### `hive.dispose()`
+
+释放 MCP 连接等资源。在应用关闭时调用。
+
+```typescript
+await hive.dispose();
 ```
 
 ## 多模型切换
@@ -441,6 +459,7 @@ createHiveMind(config)
     ├─ SkillRouter        BM25 / 关键词路由匹配
     ├─ CompositeRegistry  本地 + 远程技能注册表
     ├─ ScriptExecutor     跨语言脚本执行（安全边界内）
+    ├─ McpClientManager   MCP Server 连接管理（惰性连接 + 工具注入）
     └─ AgentRunner        Agent 技能多步执行循环
          │
          └─ call_skill    技能链调用（深度限制 + 去重缓存）

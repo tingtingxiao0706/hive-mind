@@ -52,6 +52,14 @@ const hive = createHiveMind({
     requireApproval: false,
   },
 
+  // MCP Server 连接（可选，需 npm install @modelcontextprotocol/sdk）
+  mcp: {
+    servers: [
+      { name: 'filesystem', transport: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'] } },
+    ],
+    timeout: 30_000,
+  },
+
   // 日志级别（可选，默认 'warn'）
   logLevel: 'info',
 
@@ -72,6 +80,7 @@ const hive = createHiveMind({
 | `search(query)` | 按关键词搜索技能 |
 | `install(source)` | 从远程源安装技能到本地 |
 | `runtimeStatus()` | 检查系统运行时状态 |
+| `dispose()` | 释放 MCP 连接等资源 |
 
 ## 示例
 
@@ -126,4 +135,31 @@ const hive = createHiveMind({
 // LLM 自动判断是否需要技能、选择哪个
 const result = await hive.run({ message: '翻译这段文字' });
 console.log(result.activatedSkills); // ['translator']
+```
+
+### MCP 工具集成
+
+```typescript
+const hive = createHiveMind({
+  models: { default: openai('gpt-4o') },
+  skills: [{ type: 'local', path: './skills' }],
+  mcp: {
+    servers: [
+      {
+        name: 'filesystem',
+        transport: {
+          type: 'stdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+        },
+      },
+    ],
+  },
+});
+
+// LLM 可以同时使用技能工具和 MCP 工具（如 mcp__filesystem__read_file）
+const result = await hive.run({ message: '读取 /tmp/data.json 的内容' });
+
+// 使用完毕释放 MCP 连接
+await hive.dispose();
 ```

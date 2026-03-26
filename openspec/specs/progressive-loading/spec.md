@@ -87,3 +87,26 @@
 - **WHEN** 调用 `list()` 或 `search(query)`
 - **THEN** 系统触发索引扫描（与 progressive 一致），正常返回结果
 
+### Requirement: llm-routed 加载策略
+系统 SHALL 支持 `llm-routed` 加载策略，将技能目录注入 system prompt 由 LLM 按需通过 `activate_skill` 工具激活技能。
+
+#### Scenario: LoadingConfig.strategy 扩展
+- **GIVEN** `loading.strategy` 配置为 `'llm-routed'`
+- **WHEN** 创建 HiveMind 实例
+- **THEN** 系统接受 `'llm-routed'` 作为合法策略值（strategy 联合类型: `'eager' | 'progressive' | 'lazy' | 'llm-routed'`）
+
+#### Scenario: resolveSkillContents 返回空
+- **GIVEN** `strategy === 'llm-routed'`
+- **WHEN** 进入 Phase 2 内容解析
+- **THEN** 不执行路由匹配，返回空的 `skillContents`（技能内容在 `activate_skill` 执行时动态加载）
+
+#### Scenario: ensureIndex 仍需调用
+- **GIVEN** `strategy === 'llm-routed'`
+- **WHEN** 引擎初始化
+- **THEN** 仍调用 `ensureIndex()` 构建技能目录（用于注入 system prompt），但可跳过路由索引构建
+
+#### Scenario: run/stream 多步工具追加
+- **GIVEN** `strategy === 'llm-routed'`
+- **WHEN** 调用 `run()` 或 `stream()`
+- **THEN** Phase 3 支持多 step 工具追加：system prompt 初始包含技能目录但不包含任何技能 body，每次 `activate_skill` 调用后后续 step 的 system prompt 和 tools 动态扩展
+

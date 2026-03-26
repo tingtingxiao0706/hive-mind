@@ -26,6 +26,7 @@ Hive-Mind 通过**三阶段渐进式技能加载**解决这个问题，将每轮
 | 技能链调用 | 技能之间可以互相调用（`call_skill`） |
 | 跨技能文件引用 | body 中的 markdown 链接自动识别，LLM 按需读取 |
 | LLM 驱动路由 | `llm-routed` 策略让 LLM 自主选择技能，语义理解优于关键词匹配 |
+| MCP Client | 连接外部 MCP Server，将 MCP 工具自动注入 LLM 工具链 |
 
 ## 定位
 

@@ -44,4 +44,7 @@ features:
   - icon: 🧠
     title: LLM 驱动路由
     details: llm-routed 策略让 LLM 从技能目录中自主选择，语义理解优于关键词匹配，引擎保持对激活和执行的安全管控。
+  - icon: 🔌
+    title: MCP Client 集成
+    details: 连接外部 MCP Server（stdio / SSE / streamable-http），自动将 MCP 工具注入 LLM 工具链，命名空间隔离，惰性连接零开销。
 ---

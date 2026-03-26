@@ -122,3 +122,65 @@ const hive = createHiveMind({
 - **递归深度限制**（默认 5 层，可配置 `maxCallDepth`）
 - **调用去重缓存**（相同技能 + 相同消息自动返回缓存）
 - **调用序号追踪**（日志中 `call_skill #N` 便于排查）
+
+## MCP Client 集成
+
+Hive-Mind 可以作为 MCP Client 连接外部 MCP Server，将 MCP 工具自动注入到 LLM 的工具链中。
+
+### 配置
+
+```typescript
+const hive = createHiveMind({
+  models: { default: openai('gpt-4o') },
+  skills: [{ type: 'local', path: './skills' }],
+  mcp: {
+    servers: [
+      {
+        name: 'filesystem',
+        transport: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'] },
+      },
+      {
+        name: 'github',
+        transport: { type: 'streamable-http', url: 'http://localhost:3001/mcp' },
+      },
+    ],
+    timeout: 30_000,
+  },
+});
+```
+
+### 支持的传输方式
+
+| 传输方式 | 说明 | 适用场景 |
+|----------|------|----------|
+| `stdio` | 启动本地子进程，通过 stdin/stdout 通信 | 本地 MCP Server（文件系统、数据库等） |
+| `sse` | HTTP + Server-Sent Events（旧版） | 兼容旧版 MCP Server |
+| `streamable-http` | HTTP 流式请求（推荐） | 远程 MCP Server |
+
+### 工具命名约定
+
+MCP 工具以 `mcp__<serverName>__<toolName>` 格式命名，与技能工具（`run_script`、`call_skill`）互不冲突：
+
+```
+mcp__filesystem__read_file
+mcp__github__create_issue
+mcp__database__query
+```
+
+### 惰性连接
+
+MCP 连接在首次 `run()` / `stream()` 时自动建立，不在 `createHiveMind()` 时阻塞。后续调用复用已缓存的连接和工具列表。
+
+### 资源释放
+
+使用完毕后调用 `dispose()` 关闭 MCP 连接：
+
+```typescript
+await hive.dispose();
+```
+
+### 错误处理
+
+- MCP Server 连接失败时不阻塞引擎，仅记录 warn 日志
+- 工具调用超时返回 `{ error: "MCP tool call timed out" }`
+- `@modelcontextprotocol/sdk` 未安装时给出明确安装提示

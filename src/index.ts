@@ -27,6 +27,9 @@ export type {
   RuntimeStatus,
   ExecutionStrategy,
   Logger,
+  McpConfig,
+  McpServerConfig,
+  McpTransport,
 } from './types.js';
 
 // Adapter interfaces
@@ -46,6 +49,7 @@ export { ScriptExecutor } from './executor/index.js';
 export { SandboxExecutor } from './executor/sandbox.js';
 export { RuntimeResolver, parsePEP723Deps } from './executor/runtime.js';
 export { WorkspaceManager } from './workspace/index.js';
+export { McpClientManager } from './mcp/index.js';
 export { AgentRunner } from './agent/index.js';
 export type { AgentRunOptions, AgentRunResult } from './agent/index.js';
 

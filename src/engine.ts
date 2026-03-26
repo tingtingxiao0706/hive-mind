@@ -20,6 +20,7 @@ import { LocalRegistry } from './registry/local.js';
 import { RemoteRegistry } from './registry/remote.js';
 import { ScriptExecutor } from './executor/index.js';
 import { createSkillTools } from './executor/tools.js';
+import { McpClientManager } from './mcp/index.js';
 import { createLogger } from './utils/logger.js';
 import { z } from 'zod';
 import { tool } from 'ai';
@@ -32,6 +33,7 @@ export interface HiveMind {
   search(query: string): Promise<SkillMeta[]>;
   install(source: string): Promise<string>;
   runtimeStatus(): Promise<RuntimeStatus>;
+  dispose(): Promise<void>;
 }
 
 /**
@@ -89,6 +91,11 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
     ? new ScriptExecutor({ config: config.scripts, logger })
     : null;
 
+  // McpClientManager 仅在 config.mcp 配置时创建，惰性连接
+  const mcpManager = config.mcp
+    ? new McpClientManager(config.mcp, logger)
+    : null;
+
   // 根据 config.skills 数组创建对应的注册表实例，
   // remote 和 git 类型统一走 RemoteRegistry（git 的 branch 字段当前未使用）
   const registries: SkillRegistry[] = config.skills.map(source => {
@@ -128,6 +135,14 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
     const runtimes = config.scripts?.allowedRuntimes ?? ['bash', 'python', 'node'];
     logger.info(`Preflight: checking ${runtimes.length} runtimes: [${runtimes.join(', ')}]...`);
     await executor.preflight(runtimes);
+  }
+
+  let mcpConnected = false;
+
+  async function ensureMcpConnected(): Promise<void> {
+    if (mcpConnected || !mcpManager) return;
+    mcpConnected = true;
+    await mcpManager.connect();
   }
 
   // 适配器初始化标记，ensureAdapters() 仅执行一次
@@ -403,6 +418,7 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
     options: RunOptions | StreamOptions,
   ): Promise<{ activated: SkillMeta[]; skillContents: SkillContent[] }> {
     await ensurePreflight();
+    await ensureMcpConnected();
 
     // lazy 模式 + 显式指定技能 → 跳过索引和路由，直接按名称加载
     // ensureAdapters() 保证 parser 已切换（lazy 路径不经过 ensureIndex）
@@ -520,7 +536,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         if (options.systemPrompt) routingSystemParts.push(options.systemPrompt);
         routingSystemParts.push(catalogue);
 
-        const routingTools = { ...activateTool, ...callSkillTool };
+        const mcpToolsForRouting = mcpManager ? await mcpManager.buildTools() : {};
+        const routingTools = { ...activateTool, ...mcpToolsForRouting, ...callSkillTool };
         logger.info(`Phase 2a: LLM Routing — calling model "${modelKey}" with skill catalogue (${metas.length} skills)...`);
 
         const toolCallRecords: ToolCallRecord[] = [];
@@ -572,7 +589,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         }
 
         const scriptTools = buildToolsForSkills(uniqueContents);
-        const execTools = { ...scriptTools, ...callSkillTool };
+        const mcpToolsForExec = mcpManager ? await mcpManager.buildTools() : {};
+        const execTools = { ...scriptTools, ...mcpToolsForExec, ...callSkillTool };
 
         logger.info(`Phase 3: Execution — calling model "${modelKey}" with ${Object.keys(execTools).length} tools...`);
         const execResult = await generateText({
@@ -620,7 +638,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
       }
 
       const scriptTools = buildToolsForSkills(skillContents);
-      const tools = { ...scriptTools, ...callSkillTool };
+      const mcpTools = mcpManager ? await mcpManager.buildTools() : {};
+      const tools = { ...scriptTools, ...mcpTools, ...callSkillTool };
       const hasTools = Object.keys(tools).length > 0;
 
       logger.info(`Phase 3: Execution — calling model "${modelKey}"${hasTools ? ` with ${Object.keys(tools).length} tools` : ''}...`);
@@ -702,13 +721,14 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         if (options.systemPrompt) routingSystemParts.push(options.systemPrompt);
         routingSystemParts.push(catalogue);
 
+        const mcpToolsStreamRouting = mcpManager ? await mcpManager.buildTools() : {};
         logger.info(`Phase 2a: LLM Routing [stream] — calling model "${modelKey}" with skill catalogue...`);
         const routingResult = await generateText({
           model,
           system: routingSystemParts.join('\n\n---\n\n'),
           prompt: options.message,
           maxTokens: options.maxTokens,
-          tools: { ...activateTool, ...callSkillTool } as Parameters<typeof generateText>[0]['tools'],
+          tools: { ...activateTool, ...mcpToolsStreamRouting, ...callSkillTool } as Parameters<typeof generateText>[0]['tools'],
           maxSteps: 5,
         });
 
@@ -728,7 +748,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
         }
 
         const scriptTools = buildToolsForSkills(uniqueContents);
-        const execTools = { ...scriptTools, ...callSkillTool };
+        const mcpToolsStreamExec = mcpManager ? await mcpManager.buildTools() : {};
+        const execTools = { ...scriptTools, ...mcpToolsStreamExec, ...callSkillTool };
 
         const execResult = streamText({
           model,
@@ -750,7 +771,8 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
       }
 
       const scriptTools = buildToolsForSkills(skillContents);
-      const tools = { ...scriptTools, ...callSkillTool };
+      const mcpToolsStream = mcpManager ? await mcpManager.buildTools() : {};
+      const tools = { ...scriptTools, ...mcpToolsStream, ...callSkillTool };
 
       logger.info(`Phase 3: Execution — streaming from model "${modelKey}" with ${Object.keys(tools).length} tools...`);
 
@@ -806,6 +828,10 @@ export function createHiveMind(config: HiveMindConfig): HiveMind {
       if (!executor) return {};
       const runtimes = config.scripts?.allowedRuntimes ?? ['bash', 'python', 'node'];
       return executor.preflight(runtimes);
+    },
+
+    async dispose(): Promise<void> {
+      await mcpManager?.dispose();
     },
   };
 

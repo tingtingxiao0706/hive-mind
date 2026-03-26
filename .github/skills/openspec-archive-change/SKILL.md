@@ -65,7 +65,20 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-5. **Perform the archive**
+5. **Validate `.openspec.yaml` format**
+
+   Before archiving, read `openspec/changes/<name>/.openspec.yaml` and verify:
+   - First field is `schema:` (not `status:` or anything else)
+   - Value matches `openspec/config.yaml` line 1 (e.g., `spec-driven`)
+   - `created:` field exists with a valid date
+
+   **If format is wrong**, fix it in-place before moving. The correct format is:
+   ```yaml
+   schema: spec-driven
+   created: YYYY-MM-DD
+   ```
+
+6. **Perform the archive**
 
    Create the archive directory if it doesn't exist:
    ```bash
@@ -82,7 +95,7 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name

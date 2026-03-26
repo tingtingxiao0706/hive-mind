@@ -32,6 +32,13 @@ When ready to implement, run /opsx:apply
    ```
    This creates a scaffolded change at `openspec/changes/<name>/` with `.openspec.yaml`.
 
+   **If CLI is unavailable or fails**, create the directory and `.openspec.yaml` manually with this exact format:
+   ```yaml
+   schema: spec-driven
+   created: YYYY-MM-DD
+   ```
+   The first field MUST be `schema` (not `status`). Use the schema name from `openspec/config.yaml` line 1.
+
 3. **Get the artifact build order**
    ```bash
    openspec status --change "<name>" --json

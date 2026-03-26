@@ -15,6 +15,7 @@ interface HiveMindConfig {
   router?: 'auto' | 'builtin';
   logLevel?: 'debug' | 'info' | 'warn' | 'error' | 'silent';
   maxCallDepth?: number;
+  mcp?: McpConfig;
 }
 ```
 
@@ -108,6 +109,36 @@ interface ScriptConfig {
 - 默认：`5`
 
 技能链调用的最大嵌套深度。设为 `0` 禁用 `call_skill` 工具。
+
+### mcp
+
+- 类型：`McpConfig`
+
+MCP Server 连接配置。需安装 `@modelcontextprotocol/sdk`（optional peerDependency）。
+
+```typescript
+interface McpConfig {
+  servers: McpServerConfig[];
+  timeout?: number;
+}
+
+interface McpServerConfig {
+  name: string;
+  transport: McpTransport;
+}
+
+type McpTransport =
+  | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: 'sse'; url: string; headers?: Record<string, string> }
+  | { type: 'streamable-http'; url: string; headers?: Record<string, string> };
+```
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `servers` | `[]` | MCP Server 配置列表 |
+| `timeout` | `30000` | 工具调用超时（ms） |
+| `servers[].name` | — | Server 唯一标识，用于工具名前缀 `mcp__<name>__<tool>` |
+| `servers[].transport` | — | 传输方式：`stdio`（本地子进程）、`sse`（HTTP+SSE）、`streamable-http`（HTTP 流式） |
 
 ## SandboxConfig
 
